@@ -10,5 +10,5 @@ data class SyncLogEntity(
     val repoName: String,
     val timestamp: Long,        // epoch millis
     val success: Boolean,
-    val message: String
+    val message: String         // "Pulled 3 commits" | "Conflict detected" | "Already up to date" | error message
 )

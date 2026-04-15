@@ -23,7 +23,8 @@ class RepoDaoTest {
         db = Room.inMemoryDatabaseBuilder(
             ApplicationProvider.getApplicationContext(),
             AppDatabase::class.java
-        ).allowMainThreadQueries().build()
+        ).allowMainThreadQueries() // test-only: main thread queries allowed for in-memory DB
+            .build()
         dao = db.repoDao()
     }
 
@@ -41,7 +42,8 @@ class RepoDaoTest {
             lastSyncTime = 0L,
             syncStatus = "idle"
         )
-        dao.insert(repo)
+        val id = dao.insert(repo)
+        assertThat(id).isGreaterThan(0L)
         val loaded = dao.getAll()
         assertThat(loaded).hasSize(1)
         assertThat(loaded[0].remoteUrl).isEqualTo("https://github.com/user/my-vault.git")
