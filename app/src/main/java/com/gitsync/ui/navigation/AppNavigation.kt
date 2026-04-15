@@ -9,8 +9,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.*
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.gitsync.ui.addrepo.AddRepoScreen
 import com.gitsync.ui.repolist.RepoListScreen
+import com.gitsync.ui.repolist.RepoListViewModel
 import com.gitsync.ui.settings.SettingsScreen
 import com.gitsync.ui.synclog.SyncLogScreen
 
@@ -23,7 +25,7 @@ sealed class NavRoute(val route: String, val label: String, val icon: ImageVecto
 private val topLevelRoutes = listOf(NavRoute.Repos, NavRoute.Logs, NavRoute.Settings)
 
 @Composable
-fun AppNavigation() {
+fun AppNavigation(repoListViewModel: RepoListViewModel? = null) {
     val navController = rememberNavController()
     val backstackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backstackEntry?.destination?.route
@@ -52,7 +54,8 @@ fun AppNavigation() {
             composable(NavRoute.Repos.route) {
                 RepoListScreen(
                     contentPadding = padding,
-                    onNavigateToAdd = { navController.navigate("add_repo") }
+                    onNavigateToAdd = { navController.navigate("add_repo") },
+                    viewModel = repoListViewModel ?: hiltViewModel()
                 )
             }
             composable("add_repo") { AddRepoScreen(onBack = { navController.popBackStack() }) }

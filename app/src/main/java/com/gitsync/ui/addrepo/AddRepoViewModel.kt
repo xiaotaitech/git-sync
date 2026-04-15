@@ -73,7 +73,6 @@ class AddRepoViewModel @Inject constructor(
                         repoName = entity.name,
                         localPath = entity.localPath,
                         remoteUrl = entity.remoteUrl,
-                        pat = pat,
                         intervalMinutes = state.intervalMinutes
                     )
                     workManager.enqueueUniquePeriodicWork(

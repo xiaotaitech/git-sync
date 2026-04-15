@@ -44,7 +44,8 @@ fun RepoListScreen(
                     RepoCard(
                         repo = repo,
                         isSyncing = repo.id in syncingIds,
-                        onSyncClick = { viewModel.syncRepo(repo) }
+                        onSyncClick = { viewModel.syncRepo(repo) },
+                        onDeleteClick = { viewModel.deleteRepo(repo) }
                     )
                 }
             }

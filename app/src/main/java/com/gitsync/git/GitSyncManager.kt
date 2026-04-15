@@ -1,5 +1,7 @@
 package com.gitsync.git
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.api.ResetCommand
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider
@@ -16,8 +18,7 @@ sealed class SyncResult {
 @Singleton
 class GitSyncManager @Inject constructor() {
 
-    /** Clone a remote repo into localPath. Throws on failure. */
-    fun clone(remoteUrl: String, localPath: String, pat: String) {
+    suspend fun clone(remoteUrl: String, localPath: String, pat: String) = withContext(Dispatchers.IO) {
         val dir = File(localPath)
         if (dir.exists()) dir.deleteRecursively()
         dir.mkdirs()
@@ -29,21 +30,17 @@ class GitSyncManager @Inject constructor() {
             .close()
     }
 
-    /**
-     * Pull latest from remote.
-     * Returns Conflict if local changes detected, Success/Error otherwise.
-     */
-    fun pull(localPath: String, pat: String): SyncResult {
+    suspend fun pull(localPath: String, pat: String): SyncResult = withContext(Dispatchers.IO) {
         val dir = File(localPath)
         if (!dir.exists() || !File(dir, ".git").exists()) {
-            return SyncResult.Error("Not a git repository: $localPath")
+            return@withContext SyncResult.Error("Not a git repository: $localPath")
         }
-        return try {
+        try {
             val git = Git.open(dir)
-            val changes = getLocalChanges(localPath)
+            val changes = getLocalChangesInternal(git)
             if (changes.isNotEmpty()) {
                 git.close()
-                return SyncResult.Conflict(changes)
+                return@withContext SyncResult.Conflict(changes)
             }
             val result = git.pull()
                 .setCredentialsProvider(UsernamePasswordCredentialsProvider(pat, ""))
@@ -61,10 +58,9 @@ class GitSyncManager @Inject constructor() {
         }
     }
 
-    /** Force pull: discard local changes, hard reset, then pull. */
-    fun forcePull(localPath: String, pat: String): SyncResult {
+    suspend fun forcePull(localPath: String, pat: String): SyncResult = withContext(Dispatchers.IO) {
         val dir = File(localPath)
-        return try {
+        try {
             val git = Git.open(dir)
             git.reset().setMode(ResetCommand.ResetType.HARD).setRef("HEAD").call()
             git.clean().setForce(true).setCleanDirectories(true).call()
@@ -75,17 +71,21 @@ class GitSyncManager @Inject constructor() {
         }
     }
 
-    /** Returns list of modified/untracked file paths in the working tree. */
-    fun getLocalChanges(localPath: String): List<String> {
+    suspend fun getLocalChanges(localPath: String): List<String> = withContext(Dispatchers.IO) {
         val dir = File(localPath)
-        if (!File(dir, ".git").exists()) return emptyList()
-        return try {
+        if (!File(dir, ".git").exists()) return@withContext emptyList()
+        try {
             val git = Git.open(dir)
-            val status = git.status().call()
+            val result = getLocalChangesInternal(git)
             git.close()
-            (status.modified + status.untracked + status.added + status.missing).toList()
+            result
         } catch (e: Exception) {
             emptyList()
         }
+    }
+
+    private fun getLocalChangesInternal(git: Git): List<String> {
+        val status = git.status().call()
+        return (status.modified + status.untracked + status.added + status.missing).toList()
     }
 }

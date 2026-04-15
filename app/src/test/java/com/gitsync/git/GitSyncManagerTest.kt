@@ -1,6 +1,7 @@
 package com.gitsync.git
 
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.runBlocking
 import org.eclipse.jgit.api.Git
 import org.junit.After
 import org.junit.Before
@@ -20,7 +21,7 @@ class GitSyncManagerTest {
     fun teardown() { tmpDir.deleteRecursively() }
 
     @Test
-    fun getLocalChanges_returnsEmptyForCleanRepo() {
+    fun getLocalChanges_returnsEmptyForCleanRepo() = runBlocking {
         val git = Git.init().setDirectory(tmpDir).call()
         val testFile = File(tmpDir, "note.md")
         testFile.writeText("hello")
@@ -32,7 +33,7 @@ class GitSyncManagerTest {
     }
 
     @Test
-    fun getLocalChanges_returnsModifiedFiles() {
+    fun getLocalChanges_returnsModifiedFiles() = runBlocking {
         val git = Git.init().setDirectory(tmpDir).call()
         val testFile = File(tmpDir, "note.md")
         testFile.writeText("hello")
@@ -46,7 +47,7 @@ class GitSyncManagerTest {
     }
 
     @Test
-    fun pull_returnsErrorForNonGitDirectory() {
+    fun pull_returnsErrorForNonGitDirectory() = runBlocking {
         val nonGitDir = createTempDir("notgit")
         val result = manager.pull(nonGitDir.absolutePath, "token")
         assertThat(result).isInstanceOf(SyncResult.Error::class.java)
@@ -54,7 +55,7 @@ class GitSyncManagerTest {
     }
 
     @Test
-    fun pull_returnsConflictWhenLocalChangesExist() {
+    fun pull_returnsConflictWhenLocalChangesExist() = runBlocking {
         val git = Git.init().setDirectory(tmpDir).call()
         val testFile = File(tmpDir, "note.md")
         testFile.writeText("hello")

@@ -1,6 +1,7 @@
 package com.gitsync.git
 
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.runBlocking
 import org.eclipse.jgit.api.Git
 import org.junit.After
 import org.junit.Before
@@ -19,7 +20,7 @@ class ConflictDetectorTest {
     fun teardown() { tmpDir.deleteRecursively() }
 
     @Test
-    fun hasConflict_falseForCleanRepo() {
+    fun hasConflict_falseForCleanRepo() = runBlocking {
         val git = Git.init().setDirectory(tmpDir).call()
         val f = File(tmpDir, "a.md").apply { writeText("x") }
         git.add().addFilepattern("a.md").call()
@@ -29,7 +30,7 @@ class ConflictDetectorTest {
     }
 
     @Test
-    fun hasConflict_trueAfterModification() {
+    fun hasConflict_trueAfterModification() = runBlocking {
         val git = Git.init().setDirectory(tmpDir).call()
         val f = File(tmpDir, "a.md").apply { writeText("x") }
         git.add().addFilepattern("a.md").call()

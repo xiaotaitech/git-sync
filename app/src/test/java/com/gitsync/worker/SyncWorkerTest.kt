@@ -25,7 +25,6 @@ class SyncWorkerTest {
                 SyncWorker.KEY_REPO_ID to 1L,
                 SyncWorker.KEY_LOCAL_PATH to "/tmp/nonexistent",
                 SyncWorker.KEY_REMOTE_URL to "https://github.com/x/y.git",
-                SyncWorker.KEY_PAT to "token",
                 SyncWorker.KEY_REPO_NAME to "test-repo"
             )
         ).build()

@@ -2,6 +2,7 @@ package com.gitsync.ui.repolist
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.WorkManager
 import com.gitsync.data.PrefsRepository
 import com.gitsync.data.RepoDao
 import com.gitsync.data.RepoEntity
@@ -19,7 +20,8 @@ class RepoListViewModel @Inject constructor(
     private val repoDao: RepoDao,
     private val syncLogDao: SyncLogDao,
     private val gitSyncManager: GitSyncManager,
-    private val prefsRepository: PrefsRepository
+    private val prefsRepository: PrefsRepository,
+    private val workManager: WorkManager
 ) : ViewModel() {
 
     val repos: StateFlow<List<RepoEntity>> = repoDao.getAllFlow()
@@ -89,8 +91,13 @@ class RepoListViewModel @Inject constructor(
 
     fun deleteRepo(repo: RepoEntity) {
         viewModelScope.launch {
+            workManager.cancelUniqueWork("sync_${repo.id}")
             syncLogDao.deleteForRepo(repo.id)
             repoDao.delete(repo)
         }
+    }
+
+    fun showConflict(repoId: Long, files: List<String>) {
+        _conflictState.value = Pair(repoId, files)
     }
 }
