@@ -18,11 +18,11 @@ fun ConflictDialog(
 ) {
     AlertDialog(
         onDismissRequest = onSkip,
-        title = { Text("本地有未提交的修改") },
+        title = { Text("同步冲突") },
         text = {
             Column {
                 Text(
-                    "以下文件有本地修改。如果继续，将丢失这些修改：",
+                    "以下文件在本地和远端都有修改，无法自动合并。选择\"覆盖本地\"将丢失本地修改：",
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Spacer(Modifier.height(8.dp))

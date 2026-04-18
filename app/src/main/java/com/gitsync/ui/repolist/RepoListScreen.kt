@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.outlined.FolderOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,13 +27,20 @@ fun RepoListScreen(
     Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
         if (repos.isEmpty()) {
             Column(
-                modifier = Modifier.align(Alignment.Center),
+                modifier = Modifier.align(Alignment.Center).padding(32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                Icon(
+                    Icons.Outlined.FolderOff,
+                    contentDescription = null,
+                    modifier = Modifier.size(48.dp),
+                    tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.25f)
+                )
+                Spacer(Modifier.height(16.dp))
                 Text("还没有仓库", style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f))
-                Spacer(Modifier.height(8.dp))
-                Text("点击 + 添加 GitHub 仓库", style = MaterialTheme.typography.bodyMedium,
+                Spacer(Modifier.height(4.dp))
+                Text("点击右下角 + 添加 GitHub 仓库", style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.35f))
             }
         } else {

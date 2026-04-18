@@ -51,6 +51,25 @@ fun RepoCard(
         label = "rotation"
     )
 
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("删除仓库") },
+            text = { Text("确认删除\"${repo.name}\"？本地文件夹不会被删除。") },
+            confirmButton = {
+                Button(
+                    onClick = { showDeleteConfirm = false; onDeleteClick() },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) { Text("删除") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showDeleteConfirm = false }) { Text("取消") }
+            }
+        )
+    }
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -104,7 +123,7 @@ fun RepoCard(
                 )
             }
             IconButton(
-                onClick = onDeleteClick,
+                onClick = { showDeleteConfirm = true },
                 modifier = Modifier.size(48.dp)
             ) {
                 Icon(

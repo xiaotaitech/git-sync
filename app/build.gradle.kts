@@ -45,6 +45,8 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             excludes += "META-INF/LICENSE.md"
             excludes += "META-INF/LICENSE-notice.md"
+            excludes += "OSGI-INF/l10n/plugin.properties"
+            excludes += "META-INF/DEPENDENCIES"
         }
     }
 }

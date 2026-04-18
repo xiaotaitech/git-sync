@@ -9,6 +9,7 @@ import org.eclipse.jgit.diff.DiffEntry
 import org.eclipse.jgit.lib.ObjectId
 import org.eclipse.jgit.lib.PersonIdent
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider
+import org.eclipse.jgit.revwalk.RevWalk
 import org.eclipse.jgit.treewalk.AbstractTreeIterator
 import org.eclipse.jgit.treewalk.CanonicalTreeParser
 import java.io.File
@@ -96,13 +97,20 @@ class GitSyncManager @Inject constructor() {
 
             // 3. Check for file-level conflict between local commit and remote changes
             if (hadLocalChanges) {
-                val remoteChanges = getChangedFilesBetween(git, headId, fetchHeadId)
-                // Local changes we just committed are HEAD~1..HEAD
-                val localCommittedChanges = getChangedFilesBetween(
-                    git,
-                    repo.resolve("HEAD~1") ?: headId,
-                    headId
-                )
+                // Find common ancestor so we compare each side's changes from the same base
+                val mergeBase = repo.resolve(
+                    repo.newObjectReader().use {
+                        val walk = RevWalk(repo)
+                        walk.revFilter = org.eclipse.jgit.revwalk.filter.RevFilter.MERGE_BASE
+                        walk.markStart(walk.parseCommit(headId))
+                        walk.markStart(walk.parseCommit(fetchHeadId))
+                        val base = walk.next()
+                        walk.dispose()
+                        base?.name
+                    }
+                ) ?: repo.resolve("HEAD~1") ?: headId
+                val remoteChanges = getChangedFilesBetween(git, mergeBase, fetchHeadId)
+                val localCommittedChanges = getChangedFilesBetween(git, mergeBase, headId)
                 val conflicting = localCommittedChanges.intersect(remoteChanges)
                 if (conflicting.isNotEmpty()) {
                     // Undo the auto-commit so user can decide
