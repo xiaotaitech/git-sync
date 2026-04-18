@@ -111,7 +111,7 @@ fun AddRepoScreen(
                 },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(16.dp),
                 isError = urlError != null,
                 supportingText = {
                     if (urlError != null)
@@ -160,7 +160,7 @@ fun AddRepoScreen(
                         Icon(Icons.Outlined.Schedule, contentDescription = null, modifier = Modifier.size(20.dp))
                     },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(intervalExpanded) },
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.fillMaxWidth().menuAnchor(),
                     supportingText = {
                         Text("设为\"关闭\"则仅手动同步",
@@ -186,7 +186,7 @@ fun AddRepoScreen(
             uiState.error?.let {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(16.dp)
                 ) {
                     Text(
                         it,
@@ -218,7 +218,7 @@ fun AddRepoScreen(
                 },
                 enabled = !uiState.isLoading,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(16.dp)
             ) {
                 if (uiState.isLoading) {
                     CircularProgressIndicator(

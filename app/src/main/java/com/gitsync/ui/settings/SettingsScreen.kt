@@ -84,7 +84,7 @@ fun SettingsScreen(
                         },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(16.dp),
                         visualTransformation = if (showPat) VisualTransformation.None else PasswordVisualTransformation(),
                         trailingIcon = {
                             IconButton(onClick = { showPat = !showPat }) {
@@ -106,7 +106,7 @@ fun SettingsScreen(
                             scope.launch { snackbarHostState.showSnackbar("Token 已保存") }
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(16.dp)
                     ) {
                         Text("保存 Token")
                     }
@@ -128,7 +128,7 @@ fun SettingsScreen(
                             Icon(Icons.Outlined.Schedule, contentDescription = null, modifier = Modifier.size(20.dp))
                         },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(intervalExpanded) },
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(16.dp),
                         modifier = Modifier.fillMaxWidth().menuAnchor()
                     )
                     ExposedDropdownMenu(
