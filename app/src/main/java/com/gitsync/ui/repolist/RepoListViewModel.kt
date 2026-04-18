@@ -97,6 +97,12 @@ class RepoListViewModel @Inject constructor(
         }
     }
 
+    fun syncAll() {
+        viewModelScope.launch {
+            repos.value.forEach { repo -> syncRepo(repo) }
+        }
+    }
+
     fun showConflict(repoId: Long, files: List<String>) {
         _conflictState.value = Pair(repoId, files)
     }

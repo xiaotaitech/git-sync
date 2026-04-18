@@ -4,9 +4,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.*
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -24,13 +27,40 @@ sealed class NavRoute(val route: String, val label: String, val icon: ImageVecto
 
 private val topLevelRoutes = listOf(NavRoute.Repos, NavRoute.Logs, NavRoute.Settings)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppNavigation(repoListViewModel: RepoListViewModel? = null) {
     val navController = rememberNavController()
     val backstackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backstackEntry?.destination?.route
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
+    val reposViewModel: RepoListViewModel = repoListViewModel ?: hiltViewModel()
+
+    val title = when (currentRoute) {
+        NavRoute.Repos.route -> "仓库"
+        NavRoute.Logs.route -> "同步日志"
+        NavRoute.Settings.route -> "设置"
+        else -> ""
+    }
 
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            if (currentRoute in topLevelRoutes.map { it.route }) {
+                LargeTopAppBar(
+                    title = { Text(title) },
+                    actions = {
+                        if (currentRoute == NavRoute.Repos.route) {
+                            IconButton(onClick = { reposViewModel.syncAll() }) {
+                                Icon(Icons.Default.Sync, contentDescription = "全部同步")
+                            }
+                        }
+                    },
+                    scrollBehavior = scrollBehavior
+                )
+            }
+        },
         bottomBar = {
             NavigationBar {
                 topLevelRoutes.forEach { dest ->
@@ -55,7 +85,7 @@ fun AppNavigation(repoListViewModel: RepoListViewModel? = null) {
                 RepoListScreen(
                     contentPadding = padding,
                     onNavigateToAdd = { navController.navigate("add_repo") },
-                    viewModel = repoListViewModel ?: hiltViewModel()
+                    viewModel = reposViewModel
                 )
             }
             composable("add_repo") { AddRepoScreen(onBack = { navController.popBackStack() }) }
