@@ -9,9 +9,14 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -32,29 +37,23 @@ fun AddRepoScreen(
         if (uiState.done) onBack()
     }
 
-    // Launcher for Android 11+ MANAGE_EXTERNAL_STORAGE permission settings page
     val manageStorageLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
-    ) { /* user returns from settings, re-check will happen on next save */ }
+    ) { }
 
     val folderPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
         uri?.let {
-            // Persist URI permission so it survives app restarts
             context.contentResolver.takePersistableUriPermission(
                 it,
                 Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
             )
-            // Convert SAF content URI to file path:
-            // content://com.android.externalstorage.documents/tree/primary:Documents/vault
-            //   → /storage/emulated/0/Documents/vault
             val docPath = it.path ?: return@let
             val path = when {
                 docPath.contains("/tree/primary:") ->
                     "/storage/emulated/0/" + docPath.substringAfter("/tree/primary:")
                 docPath.contains("/tree/") -> {
-                    // SD card: /tree/XXXX-XXXX:path → /storage/XXXX-XXXX/path
                     val volumeAndPath = docPath.substringAfter("/tree/")
                     val volume = volumeAndPath.substringBefore(":")
                     val subPath = volumeAndPath.substringAfter(":")
@@ -66,9 +65,18 @@ fun AddRepoScreen(
         }
     }
 
-    val intervals = listOf(0 to "关闭", 15 to "15分钟", 30 to "30分钟", 60 to "1小时", 360 to "6小时")
+    val intervals = listOf(0 to "关闭", 15 to "15 分钟", 30 to "30 分钟", 60 to "1 小时", 360 to "6 小时")
     var intervalExpanded by remember { mutableStateOf(false) }
     val selectedLabel = intervals.firstOrNull { it.first == uiState.intervalMinutes }?.second ?: "关闭"
+
+    // per-field touched state for inline validation
+    var urlTouched by remember { mutableStateOf(false) }
+    var pathTouched by remember { mutableStateOf(false) }
+
+    val urlError = if (urlTouched && uiState.remoteUrl.isNotBlank() &&
+        !uiState.remoteUrl.startsWith("https://github.com/"))
+        "请输入有效的 GitHub 仓库 URL" else null
+    val pathError = if (pathTouched && uiState.localPath.isBlank()) "请选择本地文件夹" else null
 
     Scaffold(
         topBar = {
@@ -83,28 +91,58 @@ fun AddRepoScreen(
         }
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             OutlinedTextField(
                 value = uiState.remoteUrl,
-                onValueChange = viewModel::onUrlChange,
+                onValueChange = {
+                    viewModel.onUrlChange(it)
+                    if (it.isNotBlank()) urlTouched = true
+                },
                 label = { Text("GitHub 仓库 URL") },
-                placeholder = { Text("https://github.com/user/vault.git") },
+                placeholder = { Text("https://github.com/user/repo") },
+                leadingIcon = {
+                    Icon(Icons.Outlined.Link, contentDescription = null, modifier = Modifier.size(20.dp))
+                },
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                isError = urlError != null,
+                supportingText = {
+                    if (urlError != null)
+                        Text(urlError, color = MaterialTheme.colorScheme.error)
+                    else
+                        Text("支持 HTTPS URL", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f))
+                }
             )
 
             OutlinedTextField(
                 value = uiState.localPath,
-                onValueChange = viewModel::onPathChange,
+                onValueChange = {
+                    viewModel.onPathChange(it)
+                    if (it.isBlank()) pathTouched = true
+                },
                 label = { Text("本地文件夹") },
                 placeholder = { Text("/storage/emulated/0/Documents/vault") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                isError = pathError != null,
+                supportingText = {
+                    if (pathError != null)
+                        Text(pathError, color = MaterialTheme.colorScheme.error)
+                    else
+                        Text("点击右侧图标选择文件夹", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f))
+                },
                 trailingIcon = {
                     IconButton(onClick = { folderPicker.launch(null) }) {
-                        Icon(Icons.Default.FolderOpen, contentDescription = "选择文件夹")
+                        Icon(Icons.Outlined.FolderOpen, contentDescription = "选择文件夹",
+                            modifier = Modifier.size(20.dp))
                     }
                 }
             )
@@ -118,8 +156,16 @@ fun AddRepoScreen(
                     onValueChange = {},
                     readOnly = true,
                     label = { Text("同步间隔") },
+                    leadingIcon = {
+                        Icon(Icons.Outlined.Schedule, contentDescription = null, modifier = Modifier.size(20.dp))
+                    },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(intervalExpanded) },
-                    modifier = Modifier.fillMaxWidth().menuAnchor()
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    supportingText = {
+                        Text("设为\"关闭\"则仅手动同步",
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f))
+                    }
                 )
                 ExposedDropdownMenu(
                     expanded = intervalExpanded,
@@ -138,12 +184,26 @@ fun AddRepoScreen(
             }
 
             uiState.error?.let {
-                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text(
+                        it,
+                        modifier = Modifier.padding(12.dp),
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
             }
+
+            Spacer(Modifier.height(4.dp))
 
             Button(
                 onClick = {
-                    // Android 11+: check MANAGE_EXTERNAL_STORAGE before cloning
+                    urlTouched = true
+                    pathTouched = true
+                    if (urlError != null || pathError != null) return@Button
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
                         !Environment.isExternalStorageManager()
                     ) {
@@ -157,11 +217,16 @@ fun AddRepoScreen(
                     }
                 },
                 enabled = !uiState.isLoading,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(12.dp)
             ) {
                 if (uiState.isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                    Spacer(Modifier.width(8.dp))
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                    Spacer(Modifier.width(10.dp))
                     Text("Clone 中...")
                 } else {
                     Text("添加并 Clone")

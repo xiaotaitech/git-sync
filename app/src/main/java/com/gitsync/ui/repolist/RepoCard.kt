@@ -50,6 +50,8 @@ fun RepoCard(
         animationSpec = infiniteRepeatable(tween(1000, easing = LinearEasing)),
         label = "rotation"
     )
+    // Only apply rotation when actually syncing — avoids wasting GPU/CPU when idle
+    val syncIconModifier = if (isSyncing) Modifier.rotate(rotation) else Modifier
 
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
@@ -119,8 +121,7 @@ fun RepoCard(
                     Icons.Default.Refresh,
                     contentDescription = "同步",
                     tint = Primary,
-                    modifier = if (isSyncing) Modifier.rotate(rotation) else Modifier
-                )
+                    modifier = syncIconModifier                )
             }
             IconButton(
                 onClick = { showDeleteConfirm = true },
