@@ -50,13 +50,6 @@ fun AppNavigation(repoListViewModel: RepoListViewModel? = null) {
             if (currentRoute in topLevelRoutes.map { it.route }) {
                 LargeTopAppBar(
                     title = { Text(title) },
-                    actions = {
-                        if (currentRoute == NavRoute.Repos.route) {
-                            IconButton(onClick = { reposViewModel.syncAll() }) {
-                                Icon(Icons.Default.Sync, contentDescription = "全部同步")
-                            }
-                        }
-                    },
                     scrollBehavior = scrollBehavior
                 )
             }
