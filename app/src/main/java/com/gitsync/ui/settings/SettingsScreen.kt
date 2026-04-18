@@ -1,9 +1,16 @@
 package com.gitsync.ui.settings
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BatteryAlert
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,16 +38,14 @@ fun SettingsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    // Re-check every time the screen becomes active (user may have just granted it)
     var isBatteryOptimized by remember {
         mutableStateOf(!BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context))
     }
-    // Refresh on recompose (e.g. returning from settings)
     LaunchedEffect(Unit) {
         isBatteryOptimized = !BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context)
     }
 
-    val intervals = listOf(0 to "关闭", 15 to "15分钟", 30 to "30分钟", 60 to "1小时", 360 to "6小时")
+    val intervals = listOf(0 to "关闭", 15 to "15 分钟", 30 to "30 分钟", 60 to "1 小时", 360 to "6 小时")
     val selectedLabel = intervals.firstOrNull { it.first == defaultInterval }?.second ?: "关闭"
 
     Scaffold(
@@ -52,69 +57,121 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(contentPadding)
                 .padding(innerPadding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            Text("设置", style = MaterialTheme.typography.headlineMedium)
-
-            // --- Battery optimization card ---
-            BatteryOptimizationCard(
-                isOptimized = isBatteryOptimized,
-                onRequestExemption = {
-                    context.startActivity(BatteryOptimizationHelper.requestIgnoreIntent(context))
-                }
-            )
-
-            OutlinedTextField(
-                value = patInput,
-                onValueChange = { patInput = it },
-                label = { Text("GitHub Personal Access Token") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                visualTransformation = if (showPat) VisualTransformation.None else PasswordVisualTransformation(),
-                trailingIcon = {
-                    TextButton(onClick = { showPat = !showPat }) {
-                        Text(if (showPat) "隐藏" else "显示")
+            // --- System section ---
+            SettingsSection(title = "系统") {
+                BatteryOptimizationCard(
+                    isOptimized = isBatteryOptimized,
+                    onRequestExemption = {
+                        context.startActivity(BatteryOptimizationHelper.requestIgnoreIntent(context))
                     }
-                }
-            )
-
-            Button(
-                onClick = {
-                    viewModel.savePat(patInput)
-                    scope.launch { snackbarHostState.showSnackbar("Token 已保存") }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("保存 Token")
+                )
             }
 
-            ExposedDropdownMenuBox(
-                expanded = intervalExpanded,
-                onExpandedChange = { intervalExpanded = it }
-            ) {
-                OutlinedTextField(
-                    value = selectedLabel,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("默认同步间隔") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(intervalExpanded) },
-                    modifier = Modifier.fillMaxWidth().menuAnchor()
-                )
-                ExposedDropdownMenu(
-                    expanded = intervalExpanded,
-                    onDismissRequest = { intervalExpanded = false }
-                ) {
-                    intervals.forEach { (minutes, label) ->
-                        DropdownMenuItem(
-                            text = { Text(label) },
-                            onClick = {
-                                viewModel.saveDefaultInterval(minutes)
-                                intervalExpanded = false
+            // --- Authentication section ---
+            SettingsSection(title = "认证") {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = patInput,
+                        onValueChange = { patInput = it },
+                        label = { Text("GitHub Personal Access Token") },
+                        placeholder = { Text("ghp_xxxxxxxxxxxx") },
+                        leadingIcon = {
+                            Icon(Icons.Outlined.Key, contentDescription = null, modifier = Modifier.size(20.dp))
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        visualTransformation = if (showPat) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            IconButton(onClick = { showPat = !showPat }) {
+                                Icon(
+                                    if (showPat) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                                    contentDescription = if (showPat) "隐藏" else "显示",
+                                    modifier = Modifier.size(20.dp)
+                                )
                             }
-                        )
+                        },
+                        supportingText = {
+                            Text("需要 repo 权限", style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+                        }
+                    )
+                    Button(
+                        onClick = {
+                            viewModel.savePat(patInput)
+                            scope.launch { snackbarHostState.showSnackbar("Token 已保存") }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("保存 Token")
                     }
                 }
+            }
+
+            // --- Sync section ---
+            SettingsSection(title = "同步") {
+                ExposedDropdownMenuBox(
+                    expanded = intervalExpanded,
+                    onExpandedChange = { intervalExpanded = it }
+                ) {
+                    OutlinedTextField(
+                        value = selectedLabel,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("自动同步间隔") },
+                        leadingIcon = {
+                            Icon(Icons.Outlined.Schedule, contentDescription = null, modifier = Modifier.size(20.dp))
+                        },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(intervalExpanded) },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().menuAnchor()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = intervalExpanded,
+                        onDismissRequest = { intervalExpanded = false }
+                    ) {
+                        intervals.forEach { (minutes, label) ->
+                            DropdownMenuItem(
+                                text = { Text(label) },
+                                onClick = {
+                                    viewModel.saveDefaultInterval(minutes)
+                                    intervalExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+@Composable
+private fun SettingsSection(
+    title: String,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            title,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                content()
             }
         }
     }
@@ -125,52 +182,36 @@ private fun BatteryOptimizationCard(
     isOptimized: Boolean,
     onRequestExemption: () -> Unit
 ) {
-    val containerColor = if (isOptimized)
-        MaterialTheme.colorScheme.errorContainer
-    else
-        MaterialTheme.colorScheme.secondaryContainer
+    val iconColor = if (isOptimized) MaterialTheme.colorScheme.error
+    else MaterialTheme.colorScheme.tertiary
 
-    val contentColor = if (isOptimized)
-        MaterialTheme.colorScheme.onErrorContainer
-    else
-        MaterialTheme.colorScheme.onSecondaryContainer
-
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        color = containerColor
-    ) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                if (isOptimized) Icons.Outlined.BatteryAlert else Icons.Outlined.CheckCircle,
-                contentDescription = null,
-                tint = contentColor,
-                modifier = Modifier.size(22.dp)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            if (isOptimized) Icons.Outlined.BatteryAlert else Icons.Outlined.CheckCircle,
+            contentDescription = null,
+            tint = iconColor,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                if (isOptimized) "后台同步可能受限" else "后台同步正常",
+                style = MaterialTheme.typography.bodyMedium
             )
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    if (isOptimized) "后台同步可能受限" else "后台同步正常",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = contentColor
-                )
-                Text(
-                    if (isOptimized) "此设备对本 app 启用了电池优化，定时同步可能被延迟或跳过"
-                    else "已豁免电池优化，定时同步不受系统限制",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = contentColor.copy(alpha = 0.8f)
-                )
-            }
-            if (isOptimized) {
-                Spacer(Modifier.width(8.dp))
-                OutlinedButton(
-                    onClick = onRequestExemption,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = contentColor)
-                ) {
-                    Text("去设置", style = MaterialTheme.typography.labelMedium)
-                }
+            Text(
+                if (isOptimized) "已启用电池优化，定时同步可能被延迟"
+                else "已豁免电池优化",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            )
+        }
+        if (isOptimized) {
+            Spacer(Modifier.width(8.dp))
+            FilledTonalButton(
+                onClick = onRequestExemption,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Text("去设置", style = MaterialTheme.typography.labelMedium)
             }
         }
     }
