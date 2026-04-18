@@ -38,7 +38,7 @@ class SyncWorker @AssistedInject constructor(
             return Result.failure()
         }
 
-        val syncResult = gitSyncManager.pull(localPath, pat)
+        val syncResult = gitSyncManager.sync(localPath, pat)
 
         val log = SyncLogEntity(
             repoId = repoId,

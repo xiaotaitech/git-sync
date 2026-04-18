@@ -3,13 +3,17 @@ package com.gitsync.git
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.eclipse.jgit.api.Git
+import org.eclipse.jgit.api.RebaseResult
 import org.eclipse.jgit.api.ResetCommand
 import org.eclipse.jgit.diff.DiffEntry
 import org.eclipse.jgit.lib.ObjectId
+import org.eclipse.jgit.lib.PersonIdent
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider
 import org.eclipse.jgit.treewalk.AbstractTreeIterator
 import org.eclipse.jgit.treewalk.CanonicalTreeParser
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.*
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -34,7 +38,14 @@ class GitSyncManager @Inject constructor() {
             .close()
     }
 
-    suspend fun pull(localPath: String, pat: String): SyncResult = withContext(Dispatchers.IO) {
+    /**
+     * Full two-way sync:
+     * 1. Commit any local changes
+     * 2. Fetch remote
+     * 3. If same files changed on both sides → Conflict (user decides)
+     * 4. Otherwise rebase local commits on top of remote → push
+     */
+    suspend fun sync(localPath: String, pat: String): SyncResult = withContext(Dispatchers.IO) {
         val dir = File(localPath)
         if (!dir.exists() || !File(dir, ".git").exists()) {
             return@withContext SyncResult.Error("Not a git repository: $localPath")
@@ -43,13 +54,92 @@ class GitSyncManager @Inject constructor() {
             val git = Git.open(dir)
             val creds = UsernamePasswordCredentialsProvider(pat, "")
 
-            // 1. Fetch latest from remote without merging
+            // 1. Commit local changes if any
+            val localChanges = getLocalChangesInternal(git)
+            val hadLocalChanges = localChanges.isNotEmpty()
+            if (hadLocalChanges) {
+                git.add().addFilepattern(".").call()
+                val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
+                git.commit()
+                    .setMessage("Sync: $timestamp")
+                    .setAuthor(PersonIdent("GitSync", "gitsync@local"))
+                    .call()
+            }
+
+            // 2. Fetch remote
+            git.fetch().setCredentialsProvider(creds).call()
+
+            val repo = git.repository
+            val headId = repo.resolve("HEAD")
+            val fetchHeadId = repo.resolve("FETCH_HEAD")
+
+            if (fetchHeadId == null || headId == fetchHeadId) {
+                // Nothing new on remote — if we committed, push it
+                if (hadLocalChanges) {
+                    git.push().setCredentialsProvider(creds).call()
+                    git.close()
+                    return@withContext SyncResult.Success("Pushed local changes")
+                }
+                git.close()
+                return@withContext SyncResult.Success("Already up to date")
+            }
+
+            // 3. Check for file-level conflict between local commit and remote changes
+            if (hadLocalChanges) {
+                val remoteChanges = getChangedFilesBetween(git, headId, fetchHeadId)
+                // Local changes we just committed are HEAD~1..HEAD
+                val localCommittedChanges = getChangedFilesBetween(
+                    git,
+                    repo.resolve("HEAD~1") ?: headId,
+                    headId
+                )
+                val conflicting = localCommittedChanges.intersect(remoteChanges)
+                if (conflicting.isNotEmpty()) {
+                    // Undo the auto-commit so user can decide
+                    git.reset().setMode(ResetCommand.ResetType.SOFT).setRef("HEAD~1").call()
+                    git.close()
+                    return@withContext SyncResult.Conflict(conflicting.toList())
+                }
+            }
+
+            // 4. Rebase local commits on top of remote, then push
+            val rebaseResult = git.rebase()
+                .setUpstream(fetchHeadId)
+                .call()
+
+            if (rebaseResult.status == RebaseResult.Status.OK ||
+                rebaseResult.status == RebaseResult.Status.FAST_FORWARD ||
+                rebaseResult.status == RebaseResult.Status.UP_TO_DATE
+            ) {
+                git.push().setCredentialsProvider(creds).call()
+                git.close()
+                val msg = if (hadLocalChanges) "Synced — pushed local changes and pulled remote"
+                          else "Pulled new commits"
+                SyncResult.Success(msg)
+            } else {
+                // Rebase failed (unexpected) — abort and report
+                git.rebase().setOperation(org.eclipse.jgit.api.RebaseCommand.Operation.ABORT).call()
+                git.close()
+                SyncResult.Error("Rebase failed: ${rebaseResult.status}")
+            }
+        } catch (e: Exception) {
+            SyncResult.Error(e.message ?: "Unknown error")
+        }
+    }
+
+    /** Legacy pull-only (used by forcePull path). */
+    suspend fun pull(localPath: String, pat: String): SyncResult = withContext(Dispatchers.IO) {
+        val dir = File(localPath)
+        if (!dir.exists() || !File(dir, ".git").exists()) {
+            return@withContext SyncResult.Error("Not a git repository: $localPath")
+        }
+        try {
+            val git = Git.open(dir)
+            val creds = UsernamePasswordCredentialsProvider(pat, "")
             git.fetch().setCredentialsProvider(creds).call()
 
             val localChanges = getLocalChangesInternal(git).toSet()
-
             if (localChanges.isEmpty()) {
-                // Clean working tree — just pull
                 val result = git.pull().setCredentialsProvider(creds).call()
                 git.close()
                 return@withContext if (result.isSuccessful) {
@@ -61,32 +151,24 @@ class GitSyncManager @Inject constructor() {
                 }
             }
 
-            // 2. Find files changed on remote since our HEAD
             val repo = git.repository
             val headId = repo.resolve("HEAD")
             val fetchHeadId = repo.resolve("FETCH_HEAD")
-
             if (fetchHeadId == null || headId == fetchHeadId) {
-                // No new remote commits — nothing to merge, local changes are fine
                 git.close()
                 return@withContext SyncResult.Success("Already up to date")
             }
 
             val remoteChanges = getChangedFilesBetween(git, headId, fetchHeadId)
-
-            // 3. Check for overlap between local and remote changes
             val conflicting = localChanges.intersect(remoteChanges)
-
             if (conflicting.isNotEmpty()) {
                 git.close()
                 return@withContext SyncResult.Conflict(conflicting.toList())
             }
 
-            // 4. No overlap — stash local changes, pull, pop stash
             git.stashCreate().call()
             val pullResult = git.pull().setCredentialsProvider(creds).call()
             if (!pullResult.isSuccessful) {
-                // Pull failed — restore stash and report error
                 git.stashApply().call()
                 git.close()
                 return@withContext SyncResult.Error("Pull failed: ${pullResult.mergeResult?.mergeStatus}")
@@ -99,9 +181,10 @@ class GitSyncManager @Inject constructor() {
         }
     }
 
+    /** Force pull: discard all local changes, hard reset, pull. */
     suspend fun forcePull(localPath: String, pat: String): SyncResult = withContext(Dispatchers.IO) {
         val dir = File(localPath)
-        try {
+        return@withContext try {
             val git = Git.open(dir)
             git.reset().setMode(ResetCommand.ResetType.HARD).setRef("HEAD").call()
             git.clean().setForce(true).setCleanDirectories(true).call()
@@ -115,7 +198,7 @@ class GitSyncManager @Inject constructor() {
     suspend fun getLocalChanges(localPath: String): List<String> = withContext(Dispatchers.IO) {
         val dir = File(localPath)
         if (!File(dir, ".git").exists()) return@withContext emptyList()
-        try {
+        return@withContext try {
             val git = Git.open(dir)
             val result = getLocalChangesInternal(git)
             git.close()
@@ -130,23 +213,17 @@ class GitSyncManager @Inject constructor() {
         return (status.modified + status.untracked + status.added + status.missing).toList()
     }
 
-    /** Returns set of file paths changed between two commits (e.g. HEAD..FETCH_HEAD). */
     private fun getChangedFilesBetween(git: Git, fromId: ObjectId, toId: ObjectId): Set<String> {
         val repo = git.repository
         val reader = repo.newObjectReader()
         return try {
             val oldTree: AbstractTreeIterator = CanonicalTreeParser().also { parser ->
-                val treeId = repo.parseCommit(fromId).tree.id
-                parser.reset(reader, treeId)
+                parser.reset(reader, repo.parseCommit(fromId).tree.id)
             }
             val newTree: AbstractTreeIterator = CanonicalTreeParser().also { parser ->
-                val treeId = repo.parseCommit(toId).tree.id
-                parser.reset(reader, treeId)
+                parser.reset(reader, repo.parseCommit(toId).tree.id)
             }
-            git.diff()
-                .setOldTree(oldTree)
-                .setNewTree(newTree)
-                .call()
+            git.diff().setOldTree(oldTree).setNewTree(newTree).call()
                 .flatMap { entry ->
                     listOfNotNull(
                         entry.oldPath.takeIf { it != DiffEntry.DEV_NULL },
@@ -159,4 +236,3 @@ class GitSyncManager @Inject constructor() {
         }
     }
 }
-

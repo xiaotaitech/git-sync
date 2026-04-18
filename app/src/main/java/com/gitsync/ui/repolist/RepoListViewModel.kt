@@ -39,7 +39,7 @@ class RepoListViewModel @Inject constructor(
             repoDao.update(repo.copy(syncStatus = "syncing"))
 
             val pat = prefsRepository.getPat().first()
-            val result = gitSyncManager.pull(repo.localPath, pat)
+            val result = gitSyncManager.sync(repo.localPath, pat)
 
             val (status, logMsg, success) = when (result) {
                 is SyncResult.Success -> Triple("idle", result.message, true)
