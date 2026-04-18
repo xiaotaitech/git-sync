@@ -38,7 +38,6 @@ fun RepoListScreen(
     val syncingIds by viewModel.syncingIds.collectAsState()
     val conflictState by viewModel.conflictState.collectAsState()
 
-    val okCount = repos.count { it.syncStatus == "idle" }
     val problemCount = repos.count { it.syncStatus == "conflict" || it.syncStatus == "error" }
     val syncingCount = syncingIds.size
     val lastSyncTime = repos.filter { it.lastSyncTime > 0 }.maxOfOrNull { it.lastSyncTime }
@@ -76,7 +75,6 @@ fun RepoListScreen(
                 item {
                     RepoHeroBanner(
                         total = repos.size,
-                        okCount = okCount,
                         problemCount = problemCount,
                         syncingCount = syncingCount,
                         lastSyncTime = lastSyncTime,
@@ -115,7 +113,6 @@ fun RepoListScreen(
 @Composable
 private fun RepoHeroBanner(
     total: Int,
-    okCount: Int,
     problemCount: Int,
     syncingCount: Int,
     lastSyncTime: Long?,
