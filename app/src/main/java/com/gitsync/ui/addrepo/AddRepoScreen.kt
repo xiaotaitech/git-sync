@@ -1,6 +1,11 @@
 package com.gitsync.ui.addrepo
 
+import android.Manifest
+import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -10,6 +15,7 @@ import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 
@@ -20,16 +26,42 @@ fun AddRepoScreen(
     viewModel: AddRepoViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
 
     LaunchedEffect(uiState.done) {
         if (uiState.done) onBack()
     }
 
+    // Launcher for Android 11+ MANAGE_EXTERNAL_STORAGE permission settings page
+    val manageStorageLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { /* user returns from settings, re-check will happen on next save */ }
+
     val folderPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
         uri?.let {
-            val path = it.path?.replace("/tree/primary:", "/storage/emulated/0/") ?: it.toString()
+            // Persist URI permission so it survives app restarts
+            context.contentResolver.takePersistableUriPermission(
+                it,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+            // Convert SAF content URI to file path:
+            // content://com.android.externalstorage.documents/tree/primary:Documents/vault
+            //   → /storage/emulated/0/Documents/vault
+            val docPath = it.path ?: return@let
+            val path = when {
+                docPath.contains("/tree/primary:") ->
+                    "/storage/emulated/0/" + docPath.substringAfter("/tree/primary:")
+                docPath.contains("/tree/") -> {
+                    // SD card: /tree/XXXX-XXXX:path → /storage/XXXX-XXXX/path
+                    val volumeAndPath = docPath.substringAfter("/tree/")
+                    val volume = volumeAndPath.substringBefore(":")
+                    val subPath = volumeAndPath.substringAfter(":")
+                    "/storage/$volume/$subPath"
+                }
+                else -> docPath
+            }
             viewModel.onPathChange(path)
         }
     }
@@ -110,7 +142,20 @@ fun AddRepoScreen(
             }
 
             Button(
-                onClick = viewModel::save,
+                onClick = {
+                    // Android 11+: check MANAGE_EXTERNAL_STORAGE before cloning
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+                        !Environment.isExternalStorageManager()
+                    ) {
+                        manageStorageLauncher.launch(
+                            Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                                data = Uri.parse("package:${context.packageName}")
+                            }
+                        )
+                    } else {
+                        viewModel.save()
+                    }
+                },
                 enabled = !uiState.isLoading,
                 modifier = Modifier.fillMaxWidth()
             ) {
