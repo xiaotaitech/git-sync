@@ -58,7 +58,17 @@ class GitSyncManager @Inject constructor() {
             val localChanges = getLocalChangesInternal(git)
             val hadLocalChanges = localChanges.isNotEmpty()
             if (hadLocalChanges) {
+                // Stage new + modified files
                 git.add().addFilepattern(".").call()
+                // Stage deleted (missing) files — git add -A equivalent
+                if (localChanges.isNotEmpty()) {
+                    val missing = git.status().call().missing
+                    if (missing.isNotEmpty()) {
+                        val rm = git.rm()
+                        missing.forEach { rm.addFilepattern(it) }
+                        rm.call()
+                    }
+                }
                 val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
                 git.commit()
                     .setMessage("Sync: $timestamp")
@@ -103,6 +113,11 @@ class GitSyncManager @Inject constructor() {
             }
 
             // 4. Rebase local commits on top of remote, then push
+            // Guard: if working tree still dirty after commit attempt, stash first
+            val dirtyBeforeRebase = getLocalChangesInternal(git).isNotEmpty()
+            if (dirtyBeforeRebase) {
+                git.stashCreate().call()
+            }
             val rebaseResult = git.rebase()
                 .setUpstream(fetchHeadId)
                 .call()
@@ -112,12 +127,14 @@ class GitSyncManager @Inject constructor() {
                 rebaseResult.status == RebaseResult.Status.UP_TO_DATE
             ) {
                 git.push().setCredentialsProvider(creds).call()
+                if (dirtyBeforeRebase) git.stashApply().call()
                 git.close()
                 val msg = if (hadLocalChanges) "Synced — pushed local changes and pulled remote"
                           else "Pulled new commits"
                 SyncResult.Success(msg)
             } else {
                 // Rebase failed (unexpected) — abort and report
+                if (dirtyBeforeRebase) git.stashApply().call()
                 git.rebase().setOperation(org.eclipse.jgit.api.RebaseCommand.Operation.ABORT).call()
                 git.close()
                 SyncResult.Error("Rebase failed: ${rebaseResult.status}")
