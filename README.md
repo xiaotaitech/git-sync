@@ -1,5 +1,7 @@
 # GitSync
 
+[中文文档](README.zh.md)
+
 [![Build APK](https://github.com/xiaotaitech/git-sync/actions/workflows/build.yml/badge.svg)](https://github.com/xiaotaitech/git-sync/actions/workflows/build.yml)
 [![Latest Release](https://img.shields.io/github/v/release/xiaotaitech/git-sync?include_prereleases&label=download)](https://github.com/xiaotaitech/git-sync/releases/latest)
 [![Android](https://img.shields.io/badge/Android-8.0%2B-green?logo=android)](https://developer.android.com)
