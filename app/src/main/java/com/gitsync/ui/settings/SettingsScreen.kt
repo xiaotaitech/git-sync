@@ -48,15 +48,10 @@ fun SettingsScreen(
     val intervals = listOf(0 to "关闭", 15 to "15 分钟", 30 to "30 分钟", 60 to "1 小时", 360 to "6 小时")
     val selectedLabel = intervals.firstOrNull { it.first == defaultInterval }?.second ?: "关闭"
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        contentWindowInsets = WindowInsets(0)
-    ) { innerPadding ->
+    Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(contentPadding)
-                .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)
@@ -150,6 +145,11 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(8.dp))
         }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 }
 

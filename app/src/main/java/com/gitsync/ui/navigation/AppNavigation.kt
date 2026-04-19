@@ -4,12 +4,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.*
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -19,10 +19,10 @@ import com.gitsync.ui.repolist.RepoListViewModel
 import com.gitsync.ui.settings.SettingsScreen
 import com.gitsync.ui.synclog.SyncLogScreen
 
-sealed class NavRoute(val route: String, val label: String, val icon: ImageVector) {
-    object Repos : NavRoute("repos", "仓库", Icons.Default.FolderOpen)
-    object Logs : NavRoute("logs", "日志", Icons.Default.History)
-    object Settings : NavRoute("settings", "设置", Icons.Default.Settings)
+sealed class NavRoute(val route: String, val label: String, val icon: ImageVector, val selectedIcon: ImageVector) {
+    object Repos : NavRoute("repos", "仓库", Icons.Outlined.FolderOpen, Icons.Filled.FolderOpen)
+    object Logs : NavRoute("logs", "日志", Icons.Outlined.History, Icons.Filled.History)
+    object Settings : NavRoute("settings", "设置", Icons.Outlined.Settings, Icons.Filled.Settings)
 }
 
 private val topLevelRoutes = listOf(NavRoute.Repos, NavRoute.Logs, NavRoute.Settings)
@@ -33,7 +33,6 @@ fun AppNavigation(repoListViewModel: RepoListViewModel? = null) {
     val navController = rememberNavController()
     val backstackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backstackEntry?.destination?.route
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     val reposViewModel: RepoListViewModel = repoListViewModel ?: hiltViewModel()
 
@@ -44,21 +43,26 @@ fun AppNavigation(repoListViewModel: RepoListViewModel? = null) {
         else -> ""
     }
 
+    val barColor = MaterialTheme.colorScheme.surface
+
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             if (currentRoute in topLevelRoutes.map { it.route }) {
-                LargeTopAppBar(
-                    title = { Text(title) },
-                    scrollBehavior = scrollBehavior
+                TopAppBar(
+                    title = { Text(title, style = MaterialTheme.typography.titleLarge) },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = barColor,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface
+                    )
                 )
             }
         },
         bottomBar = {
-            NavigationBar {
+            NavigationBar(containerColor = barColor) {
                 topLevelRoutes.forEach { dest ->
+                    val selected = currentRoute == dest.route
                     NavigationBarItem(
-                        selected = currentRoute == dest.route,
+                        selected = selected,
                         onClick = {
                             navController.navigate(dest.route) {
                                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
@@ -66,8 +70,20 @@ fun AppNavigation(repoListViewModel: RepoListViewModel? = null) {
                                 restoreState = true
                             }
                         },
-                        icon = { Icon(dest.icon, contentDescription = dest.label) },
-                        label = { Text(dest.label) }
+                        icon = {
+                            Icon(
+                                if (selected) dest.selectedIcon else dest.icon,
+                                contentDescription = dest.label
+                            )
+                        },
+                        label = { Text(dest.label) },
+                        colors = NavigationBarItemDefaults.colors(
+                            indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     )
                 }
             }

@@ -8,6 +8,7 @@ plugins {
 android {
     namespace = "com.gitsync"
     compileSdk = 34
+    buildToolsVersion = "34.0.0"
     defaultConfig {
         applicationId = "com.gitsync"
         minSdk = 26

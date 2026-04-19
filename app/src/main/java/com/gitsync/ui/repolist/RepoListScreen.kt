@@ -119,7 +119,7 @@ private fun RepoHeroBanner(
     onSyncAll: () -> Unit
 ) {
     val primary = MaterialTheme.colorScheme.primary
-    val tertiary = MaterialTheme.colorScheme.tertiary
+    val secondary = MaterialTheme.colorScheme.secondary
 
     val (statusLabel, statusIcon, statusColor) = when {
         syncingCount > 0 -> Triple("同步中 $syncingCount 个", Icons.Default.Sync, MaterialTheme.colorScheme.primaryContainer)
@@ -142,7 +142,7 @@ private fun RepoHeroBanner(
             .clip(RoundedCornerShape(20.dp))
             .background(
                 Brush.linearGradient(
-                    colors = listOf(primary, tertiary),
+                    colors = listOf(primary, secondary),
                     start = Offset(0f, 0f),
                     end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
                 )
@@ -236,3 +236,4 @@ private fun RepoHeroBanner(
         }
     }
 }
+
